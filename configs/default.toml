@@ -1,0 +1,64 @@
+[attack]
+# Number of optimization iterations
+num_iterations = 100
+# Confidence threshold for Mask R-CNN detections
+confidence_threshold = 0.8
+# Nuclear norm regularization weight
+lambda1 = 0.1
+# Frobenius norm regularization weight
+lambda2 = 0.01
+# Exponentiated gradient learning rate
+eta = 0.55
+# Singular value truncation fraction (1.0 = keep all, 'top1' = keep only top-1)
+k = 1.0
+# Perturbation clamp range
+delta_lower = -1.0
+delta_upper = 1.0
+# Batch size for frame processing
+batch_size = 30
+# Loss weights
+loss_weight_fg = 1.0
+loss_weight_bg = -1.0
+loss_weight_conf = 0.001
+
+[data]
+# COCO dataset root
+coco_root = "/mnt/forge-data/datasets/coco"
+# Pre-computed DINOv2 features
+dinov2_features = "/mnt/forge-data/shared_infra/datasets/coco_dinov2_features"
+# Image split to use
+split = "val2017"
+# Max images to load (0 = all)
+max_images = 500
+# Target image size (height, width)
+image_size = [640, 640]
+
+[model]
+# Target detector
+detector = "maskrcnn_resnet50_fpn"
+# Use pretrained weights
+pretrained = true
+# Target class ID (1 = person in COCO)
+target_class = 1
+
+[training]
+# Device
+device = "cuda:0"
+# Mixed precision
+amp = true
+# Gradient accumulation steps
+grad_accum_steps = 1
+# Checkpoint save interval (iterations)
+save_interval = 25
+# Output directory
+output_dir = "/mnt/artifacts-datai/checkpoints/DEF-aoexp"
+# Log directory
+log_dir = "/mnt/artifacts-datai/logs/DEF-aoexp"
+
+[export]
+# Export directory
+export_dir = "/mnt/artifacts-datai/exports/DEF-aoexp"
+# ONNX opset version
+onnx_opset = 17
+# TensorRT workspace size (GB)
+trt_workspace_gb = 4

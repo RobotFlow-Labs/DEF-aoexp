@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "def-aoexp"
+version = "0.1.0"
+description = "AO-Exp: Structured Universal Adversarial Attacks on Object Detection for Video Sequences"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "ANIMA Team", email = "team@robotflowlabs.com" },
+]
+dependencies = [
+    "torch>=2.6.0",
+    "torchvision>=0.21.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "safetensors>=0.4.0",
+    "onnx>=1.15.0",
+    "onnxruntime>=1.17.0",
+    "Pillow>=10.0.0",
+    "pycocotools>=2.0.7",
+    "tqdm>=4.65.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "rich>=13.0.0",
+    "toml>=0.10.2",
+    "onnxscript>=0.6.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.3.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/def_aoexp"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+select = ["E", "F", "I", "B", "UP", "N", "C4"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
