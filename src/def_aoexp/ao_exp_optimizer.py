@@ -13,8 +13,20 @@ Key improvements over reference numpy implementation:
 
 from __future__ import annotations
 
+import logging
+
 import torch
 import torch.nn.functional as F  # noqa: N812
+
+logger = logging.getLogger(__name__)
+
+# Try to load custom CUDA kernel for proximal operator
+_cuda_svd_prox = None
+try:
+    from aoexp_cuda_kernels import svd_nuclear_prox as _cuda_svd_prox
+    logger.info("CUDA svd_nuclear_prox kernel loaded")
+except ImportError:
+    pass
 
 
 def _lambert_w0_approx(z: torch.Tensor) -> torch.Tensor:
@@ -156,33 +168,49 @@ class AOExpOptimizer:
             s_y = beta_const * torch.exp(s_z / alpha) - beta_const
 
             # Proximal operator for nuclear + Frobenius regularization
-            if self.lambda2 == 0.0:
-                s_new = beta_const * torch.exp(
-                    F.relu(torch.log(s_y / beta_const + 1.0) - self.lambda1 * self.t / alpha)
-                ) - beta_const
-            else:
-                a = beta_const
-                b = self.lambda2 * self.t / alpha
-                c_val = torch.clamp(
-                    self.lambda1 * self.t / alpha - torch.log(s_y / beta_const + 1.0),
-                    max=0.0,
+            k = min(self.k_val, len(s_y))
+
+            if _cuda_svd_prox is not None and s_y.is_cuda:
+                # CUDA kernel: fused proximal + top-k in one pass
+                s_trunc = _cuda_svd_prox(
+                    s_y.contiguous(),
+                    self.lambda1,
+                    self.lambda2,
+                    self.t,
+                    alpha.item() if isinstance(alpha, torch.Tensor) else alpha,
+                    beta_const,
+                    k,
                 )
-                ab = torch.as_tensor(a * b, device=self.device)
-                abc = torch.log(ab) + ab - c_val
+            else:
+                # PyTorch fallback
+                if self.lambda2 == 0.0:
+                    s_new = beta_const * torch.exp(
+                        F.relu(
+                            torch.log(s_y / beta_const + 1.0)
+                            - self.lambda1 * self.t / alpha
+                        )
+                    ) - beta_const
+                else:
+                    a = beta_const
+                    b = self.lambda2 * self.t / alpha
+                    c_val = torch.clamp(
+                        self.lambda1 * self.t / alpha
+                        - torch.log(s_y / beta_const + 1.0),
+                        max=0.0,
+                    )
+                    ab = torch.as_tensor(a * b, device=self.device)
+                    abc = torch.log(ab) + ab - c_val
 
-                # Use Lambert W for moderate values, log approximation for large
-                large_mask = abc >= 15.0
-                log_abc = torch.log(abc.clamp(min=1e-30))
-                log_log_abc = torch.log(log_abc.clamp(min=1e-30))
-                w_large = log_abc - log_log_abc + log_log_abc / log_abc
-                w_small = _lambert_w0_approx(torch.exp(abc))
-                w_val = torch.where(large_mask, w_large, w_small)
-                s_new = w_val / b - a
+                    large_mask = abc >= 15.0
+                    log_abc = torch.log(abc.clamp(min=1e-30))
+                    log_log_abc = torch.log(log_abc.clamp(min=1e-30))
+                    w_large = log_abc - log_log_abc + log_log_abc / log_abc
+                    w_small = _lambert_w0_approx(torch.exp(abc))
+                    w_val = torch.where(large_mask, w_large, w_small)
+                    s_new = w_val / b - a
 
-            # Top-k truncation
-            s_trunc = torch.zeros_like(s_new)
-            k = min(self.k_val, len(s_new))
-            s_trunc[:k] = s_new[:k]
+                s_trunc = torch.zeros_like(s_new)
+                s_trunc[:k] = s_new[:k]
 
             # Reconstruct perturbation channel
             new_x = u_z * s_trunc.unsqueeze(0) @ vh_z

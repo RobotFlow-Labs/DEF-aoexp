@@ -1,0 +1,38 @@
+[attack]
+num_iterations = 100
+confidence_threshold = 0.7
+lambda1 = 0.1
+lambda2 = 0.01
+eta = 0.55
+k = 1.0
+delta_lower = -1.0
+delta_upper = 1.0
+batch_size = 16
+loss_weight_fg = 1.0
+loss_weight_bg = -1.0
+loss_weight_conf = 0.001
+
+[data]
+coco_root = "/mnt/forge-data/datasets/coco"
+dinov2_features = "/mnt/forge-data/shared_infra/datasets/coco_dinov2_features"
+split = "val2017"
+max_images = 500
+image_size = [640, 640]
+
+[model]
+detector = "maskrcnn_resnet50_fpn"
+pretrained = true
+target_class = 0
+
+[training]
+device = "cuda:0"
+amp = true
+grad_accum_steps = 1
+save_interval = 25
+output_dir = "/mnt/artifacts-datai/checkpoints/DEF-aoexp"
+log_dir = "/mnt/artifacts-datai/logs/DEF-aoexp"
+
+[export]
+export_dir = "/mnt/artifacts-datai/exports/DEF-aoexp"
+onnx_opset = 17
+trt_workspace_gb = 4

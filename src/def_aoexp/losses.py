@@ -2,15 +2,29 @@
 
 from __future__ import annotations
 
+import logging
+
 import torch
 import torch.nn.functional as F  # noqa: N812
 from torchvision.ops import box_iou
+
+logger = logging.getLogger(__name__)
+
+# Try to load CUDA fused mask CE kernel
+_cuda_fused_mask_ce = None
+try:
+    from aoexp_cuda_kernels import fused_mask_ce as _cuda_fused_mask_ce
+    logger.info("CUDA fused_mask_ce kernel loaded")
+except ImportError:
+    pass
 
 
 def mask_cross_entropy_losses(
     adv_mask: torch.Tensor, clean_mask: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Compute foreground and background CE losses between adversarial and clean masks.
+
+    Uses custom CUDA kernel when available for single-pass computation.
 
     Args:
         adv_mask: Adversarial prediction mask, shape (H, W) in [0, 1].
@@ -19,7 +33,15 @@ def mask_cross_entropy_losses(
     Returns:
         (loss_fg, loss_bg): Cross-entropy losses for foreground and background pixels.
     """
-    # Stack into 2-class probabilities: (H*W, 2)
+    if _cuda_fused_mask_ce is not None and adv_mask.is_cuda:
+        # CUDA kernel: single-pass FG/BG CE with block reduction
+        losses = _cuda_fused_mask_ce(
+            adv_mask.contiguous().flatten(),
+            clean_mask.contiguous().flatten(),
+        )
+        return losses[0].squeeze(), losses[1].squeeze()
+
+    # PyTorch fallback
     adv_probs = torch.stack([1.0 - adv_mask, adv_mask], dim=-1).reshape(-1, 2)
     target = ((clean_mask > 0).float()).flatten().long()
 

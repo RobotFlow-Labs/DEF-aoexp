@@ -33,14 +33,43 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Try loading custom CUDA kernels
+# Load custom CUDA kernels via JIT compilation
 _HAS_CUSTOM_KERNELS = False
-try:
-    from aoexp_cuda_kernels import fused_mask_ce, svd_nuclear_prox  # noqa: F401
-    _HAS_CUSTOM_KERNELS = True
-    logger.info("Custom CUDA kernels loaded successfully")
-except ImportError:
-    logger.info("Custom CUDA kernels not available, using PyTorch fallback")
+
+
+def _load_cuda_kernels():
+    """JIT-load custom CUDA kernels, bypassing nvcc version check."""
+    global _HAS_CUSTOM_KERNELS
+    import torch.utils.cpp_extension as _ext
+
+    kernel_dir = Path(__file__).parent.parent.parent / "kernels"
+    src = kernel_dir / "aoexp_cuda_kernels.cu"
+    if not src.exists():
+        logger.info("CUDA kernel source not found at %s", src)
+        return
+
+    # Bypass CUDA version check (system nvcc 12.0 vs torch cu130)
+    _ext._check_cuda_version = lambda *a, **k: None
+
+    try:
+        mod = _ext.load(
+            name="aoexp_cuda_kernels",
+            sources=[str(src)],
+            extra_cuda_cflags=[
+                "-O3", "-gencode=arch=compute_89,code=sm_89", "--use_fast_math",
+            ],
+            extra_cflags=["-O3"],
+            verbose=False,
+        )
+        # Inject into the modules that need them
+        import def_aoexp.ao_exp_optimizer as _opt
+        import def_aoexp.losses as _losses
+        _opt._cuda_svd_prox = mod.svd_nuclear_prox
+        _losses._cuda_fused_mask_ce = mod.fused_mask_ce
+        _HAS_CUSTOM_KERNELS = True
+        logger.info("Custom CUDA kernels JIT-loaded and injected successfully")
+    except Exception as e:
+        logger.warning("Failed to JIT-load CUDA kernels: %s", e)
 
 
 def check_vram_budget(device: str, target_pct: float = 0.65) -> dict:
@@ -77,6 +106,9 @@ def main(config_path: str | None = None):
     if args.max_images:
         cfg.data.max_images = args.max_images
     cfg.training.amp = args.amp
+
+    # JIT-load custom CUDA kernels
+    _load_cuda_kernels()
 
     # Setup output dirs
     output_dir = Path(cfg.training.output_dir)

@@ -62,10 +62,21 @@ class AOExpAttackEngine:
         self.nuc_norm_history: list[float] = []
         self.box_ratio_history: list[float] = []
 
+    def _select_detections(self, pred: dict, threshold: float) -> torch.Tensor:
+        """Select detections above threshold, optionally filtering by class.
+
+        target_class=0 means attack ALL classes (universal attack on COCO).
+        target_class>0 means attack only that specific class.
+        """
+        score_mask = pred["scores"] >= threshold
+        target_cls = self.cfg.model.target_class
+        if target_cls > 0:
+            return score_mask & (pred["labels"] == target_cls)
+        return score_mask
+
     def _compute_gradient(self) -> torch.Tensor:
         """Compute averaged gradient of attack loss across all image batches."""
         threshold = self.cfg.attack.confidence_threshold
-        target_cls = self.cfg.model.target_class
         batch_size = self.cfg.attack.batch_size
 
         # Get current perturbation as (C, H, W)
@@ -95,9 +106,7 @@ class AOExpAttackEngine:
                 with torch.no_grad():
                     clean_pred = self.model([img])[0]
 
-                clean_mask_sel = (clean_pred["scores"] >= threshold) & (
-                    clean_pred["labels"] == target_cls
-                )
+                clean_mask_sel = self._select_detections(clean_pred, threshold)
                 clean_boxes = clean_pred["boxes"][clean_mask_sel].detach().cpu()
                 n_gt_boxes += clean_mask_sel.sum().item()
 
@@ -109,9 +118,7 @@ class AOExpAttackEngine:
 
                 # Adversarial predictions (with gradient)
                 adv_pred = self.model([adv_img])[0]
-                adv_mask_sel = (adv_pred["scores"] >= threshold) & (
-                    adv_pred["labels"] == target_cls
-                )
+                adv_mask_sel = self._select_detections(adv_pred, threshold)
                 n_adv_boxes += adv_mask_sel.sum().item()
 
                 if (
@@ -145,6 +152,9 @@ class AOExpAttackEngine:
                 total_grad += delta_chw.grad.detach()
                 delta_chw.grad = None
             num_batches += 1
+            # Free intermediate computation graphs to manage VRAM
+            del batch_loss
+            torch.cuda.empty_cache()
 
         if num_batches > 0:
             total_grad /= num_batches
