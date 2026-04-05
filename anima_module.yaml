@@ -1,0 +1,53 @@
+name: DEF-aoexp
+version: 0.1.0
+kind: defense
+wave: 8
+paper:
+  title: "Structured Universal Adversarial Attacks on Object Detection for Video Sequences"
+  arxiv: "2510.14460"
+  repo: "https://github.com/jsve96/AO-Exp-Attack"
+  conference: "GCPR 2025"
+capabilities:
+  - universal_adversarial_perturbation
+  - video_object_detection_attack
+  - nuclear_norm_regularization
+  - mask_rcnn_attack
+runtime:
+  python: "3.10"
+  backends: ["cuda"]
+  default_backend: "cuda"
+models:
+  perturbation_applier:
+    params: "1.2M (640x640x3 perturbation tensor)"
+    input: "image (3, 640, 640) float32 [0,1]"
+    output: "adversarial_image (3, 640, 640) float32 [0,1]"
+  target_detector:
+    name: "Mask R-CNN (ResNet-50-FPN)"
+    source: "torchvision pretrained"
+api:
+  health: /health
+  ready: /ready
+  info: /info
+  predict: /predict
+docker:
+  image: "anima-def-aoexp:0.1.0"
+  port: 8080
+  gpu: true
+datasets:
+  - name: "COCO val2017"
+    path: "/mnt/forge-data/datasets/coco/val2017"
+  - name: "COCO DINOv2 features"
+    path: "/mnt/forge-data/shared_infra/datasets/coco_dinov2_features"
+cuda_kernels:
+  - name: svd_nuclear_prox
+    purpose: "Fused SVD proximal operator with Lambert W for nuclear+Frobenius norm"
+    arch: sm_89
+  - name: fused_mask_ce
+    purpose: "Single-pass foreground/background mask cross-entropy with block reduction"
+    arch: sm_89
+exports:
+  pth: "/mnt/artifacts-datai/exports/DEF-aoexp/perturbation.pth"
+  safetensors: "/mnt/artifacts-datai/exports/DEF-aoexp/perturbation.safetensors"
+  onnx: "/mnt/artifacts-datai/exports/DEF-aoexp/perturbation_applier.onnx"
+  trt_fp16: "/mnt/artifacts-datai/exports/DEF-aoexp/perturbation_applier_fp16.trt"
+  trt_fp32: "/mnt/artifacts-datai/exports/DEF-aoexp/perturbation_applier_fp32.trt"

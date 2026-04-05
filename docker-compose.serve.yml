@@ -1,0 +1,35 @@
+services:
+  def-aoexp:
+    build:
+      context: .
+      dockerfile: Dockerfile.serve
+    environment:
+      - ANIMA_BACKEND=${ANIMA_BACKEND:-cuda}
+      - ANIMA_MODULE_NAME=DEF-aoexp
+      - ANIMA_MODULE_VERSION=0.1.0
+      - ANIMA_SERVE_PORT=8080
+      - ANIMA_DEVICE=auto
+      - ANIMA_WEIGHT_PATH=/data/weights/perturbation.pth
+    volumes:
+      - /mnt/artifacts-datai/exports/DEF-aoexp:/data/weights:ro
+    ports:
+      - "8080:8080"
+    network_mode: host
+    restart: unless-stopped
+    profiles: ["serve", "api"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.serve
+    command: ["python", "-m", "pytest", "tests/", "-x", "-v"]
+    volumes:
+      - ./tests:/app/tests:ro
+    profiles: ["test"]
