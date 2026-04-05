@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 from torchvision.ops import box_iou
 
 
@@ -49,22 +49,30 @@ def compute_iou_metric(
 
 def nuclear_norm(x: torch.Tensor) -> torch.Tensor:
     """Mean nuclear norm across channels. Input shape (C, H, W) or (H, W, C)."""
-    if x.dim() == 3 and x.shape[0] <= 4:
-        # (C, H, W) format
-        return torch.mean(torch.stack([torch.linalg.svdvals(x[c]).sum() for c in range(x.shape[0])]))
-    # (H, W, C) format
-    c = x.shape[-1]
+    if x.dim() != 3:
+        raise ValueError(f"Expected 3D tensor, got {x.dim()}D")
+    # Detect format: (H, W, C) has last dim small, (C, H, W) has first dim small
+    if x.shape[-1] <= x.shape[0] and x.shape[-1] <= x.shape[1]:
+        # (H, W, C) format
+        c = x.shape[-1]
+        return torch.mean(
+            torch.stack([torch.linalg.svdvals(x[:, :, ch]).sum() for ch in range(c)])
+        )
+    # (C, H, W) format
     return torch.mean(
-        torch.stack([torch.linalg.svdvals(x[:, :, ch]).sum() for ch in range(c)])
+        torch.stack([torch.linalg.svdvals(x[c]).sum() for c in range(x.shape[0])])
     )
 
 
 def mean_absolute_perturbation(delta: torch.Tensor) -> float:
-    """MAP metric: mean absolute perturbation normalized by spatial dimensions."""
-    if delta.dim() == 3 and delta.shape[-1] == 3:
+    """MAP metric: mean per-pixel absolute perturbation averaged over spatial dims.
+
+    Matches reference: np.sum(np.mean(np.abs(Result), axis=2)) / (H * W)
+    """
+    if delta.dim() == 3 and delta.shape[-1] <= delta.shape[0]:
         # (H, W, C)
         h, w = delta.shape[0], delta.shape[1]
-    else:
-        # (C, H, W)
-        h, w = delta.shape[1], delta.shape[2]
-    return (torch.mean(torch.abs(delta)).item() * delta.shape[-1]) / 1.0
+        return torch.mean(torch.abs(delta), dim=2).sum().item() / (h * w)
+    # (C, H, W)
+    h, w = delta.shape[1], delta.shape[2]
+    return torch.mean(torch.abs(delta), dim=0).sum().item() / (h * w)

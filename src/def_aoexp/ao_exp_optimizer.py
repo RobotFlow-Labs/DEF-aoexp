@@ -14,7 +14,7 @@ Key improvements over reference numpy implementation:
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 
 
 def _lambert_w0_approx(z: torch.Tensor) -> torch.Tensor:
@@ -101,6 +101,9 @@ class AOExpOptimizer:
         self.t = 0.0
         self.beta = 0.0
 
+        # Pre-compute constants to avoid per-step allocations
+        self._log_d1 = torch.log(torch.tensor(self.d + 1.0, device=self.device))
+
     @torch.no_grad()
     def step(self, gradient: torch.Tensor) -> torch.Tensor:
         """Perform one AO-Exp update step.
@@ -127,7 +130,7 @@ class AOExpOptimizer:
 
             alpha = (
                 torch.sqrt(self.lam_acc[ch])
-                / (torch.sqrt(torch.log(torch.tensor(self.d + 1.0, device=self.device))))
+                / torch.sqrt(self._log_d1)
                 * self.eta
             )
             alpha = alpha.clamp(min=1e-6)
@@ -169,9 +172,9 @@ class AOExpOptimizer:
 
                 # Use Lambert W for moderate values, log approximation for large
                 large_mask = abc >= 15.0
-                w_large = torch.log(abc) - torch.log(torch.log(abc.clamp(min=1e-30))) + (
-                    torch.log(torch.log(abc.clamp(min=1e-30))) / torch.log(abc.clamp(min=1e-30))
-                )
+                log_abc = torch.log(abc.clamp(min=1e-30))
+                log_log_abc = torch.log(log_abc.clamp(min=1e-30))
+                w_large = log_abc - log_log_abc + log_log_abc / log_abc
                 w_small = _lambert_w0_approx(torch.exp(abc))
                 w_val = torch.where(large_mask, w_large, w_small)
                 s_new = w_val / b - a

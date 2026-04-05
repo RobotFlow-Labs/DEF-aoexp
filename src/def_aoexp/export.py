@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import numpy as np
 import torch
 
 logger = logging.getLogger(__name__)
@@ -101,10 +100,10 @@ def export_tensorrt(
         logger.warning("TensorRT Python not available, using trtexec CLI")
         return _export_trt_cli(onnx_path, output_dir, precision, workspace_gb)
 
-    TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
-    builder = trt.Builder(TRT_LOGGER)
+    trt_logger = trt.Logger(trt.Logger.WARNING)
+    builder = trt.Builder(trt_logger)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
-    parser = trt.OnnxParser(network, TRT_LOGGER)
+    parser = trt.OnnxParser(network, trt_logger)
 
     with open(onnx_path, "rb") as f:
         if not parser.parse(f.read()):
@@ -207,7 +206,8 @@ def run_full_export(
     # 4. TensorRT FP32
     try:
         results["trt_fp32"] = export_tensorrt(
-            onnx_path, output_dir, precision="fp32", workspace_gb=trt_workspace_gb, image_size=image_size
+            onnx_path, output_dir, precision="fp32",
+            workspace_gb=trt_workspace_gb, image_size=image_size
         )
     except Exception as e:
         logger.error("TRT FP32 export failed: %s", e)
@@ -216,7 +216,8 @@ def run_full_export(
     # 5. TensorRT FP16
     try:
         results["trt_fp16"] = export_tensorrt(
-            onnx_path, output_dir, precision="fp16", workspace_gb=trt_workspace_gb, image_size=image_size
+            onnx_path, output_dir, precision="fp16",
+            workspace_gb=trt_workspace_gb, image_size=image_size
         )
     except Exception as e:
         logger.error("TRT FP16 export failed: %s", e)

@@ -9,12 +9,12 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import torch
 
 from .attack_engine import AOExpAttackEngine
 from .config import AOExpConfig
 from .data_pipeline import load_coco_images
 from .export import run_full_export
+from .utils import NumpyEncoder
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,17 +22,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
-
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, (np.float32, np.float64)):
-            return float(obj)
-        if isinstance(obj, torch.Tensor):
-            return obj.cpu().numpy().tolist()
-        return super().default(obj)
 
 
 def main(config_path: str | None = None):
@@ -117,7 +106,7 @@ def main(config_path: str | None = None):
 
     # Full export pipeline
     logger.info("Running export pipeline...")
-    export_results = run_full_export(
+    run_full_export(
         perturbation=perturbation,
         output_dir=export_dir,
         metadata=results,

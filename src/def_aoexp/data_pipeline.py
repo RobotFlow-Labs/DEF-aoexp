@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 import torch
-import torchvision.transforms.functional as TF
+import torchvision.transforms.functional as TF  # noqa: N812
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -66,7 +66,9 @@ class COCOImageDataset(Dataset):
         if self.dinov2_dir:
             feat_path = self.dinov2_dir / f"{img_path.stem}.pt"
             if feat_path.exists():
-                result["dinov2_features"] = torch.load(feat_path, map_location="cpu", weights_only=True)
+                result["dinov2_features"] = torch.load(
+                    feat_path, map_location="cpu", weights_only=True
+                )
 
         return result
 

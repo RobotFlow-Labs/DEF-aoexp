@@ -12,19 +12,18 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import torch
-import torch.cuda.amp as amp
 
 from .attack_engine import AOExpAttackEngine
 from .config import AOExpConfig
 from .data_pipeline import load_coco_images
 from .export import run_full_export
+from .utils import NumpyEncoder
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,22 +36,11 @@ logger = logging.getLogger(__name__)
 # Try loading custom CUDA kernels
 _HAS_CUSTOM_KERNELS = False
 try:
-    from aoexp_cuda_kernels import svd_nuclear_prox, fused_mask_ce
+    from aoexp_cuda_kernels import fused_mask_ce, svd_nuclear_prox  # noqa: F401
     _HAS_CUSTOM_KERNELS = True
     logger.info("Custom CUDA kernels loaded successfully")
 except ImportError:
     logger.info("Custom CUDA kernels not available, using PyTorch fallback")
-
-
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, (np.float32, np.float64)):
-            return float(obj)
-        if isinstance(obj, torch.Tensor):
-            return obj.cpu().numpy().tolist()
-        return super().default(obj)
 
 
 def check_vram_budget(device: str, target_pct: float = 0.65) -> dict:
@@ -160,7 +148,7 @@ def main(config_path: str | None = None):
 
     # Export
     logger.info("Running full export pipeline...")
-    export_results = run_full_export(
+    run_full_export(
         perturbation=perturbation,
         output_dir=export_dir,
         metadata=metrics,

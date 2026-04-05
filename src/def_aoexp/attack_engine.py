@@ -16,7 +16,6 @@ from .losses import (
     confidence_loss,
     mask_cross_entropy_losses,
     mean_absolute_perturbation,
-    nuclear_norm,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,7 +82,8 @@ class AOExpAttackEngine:
             batch_end = min(batch_start + batch_size, len(self.images))
             batch_imgs = self.images[batch_start:batch_end]
 
-            delta_chw.requires_grad_(True)
+            if delta_chw.grad is not None:
+                delta_chw.grad = None
             batch_loss = torch.tensor(0.0, device=self.device, requires_grad=False)
             has_grad = False
 
