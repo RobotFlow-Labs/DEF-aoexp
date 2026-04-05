@@ -1,0 +1,18 @@
+{
+  "svd_nuclear_prox": {
+    "pytorch_ms": 1.00204541015625,
+    "cuda_ms": 0.012840959548950195,
+    "speedup": 78.03508813624225
+  },
+  "fused_mask_ce": {
+    "pytorch_ms": 0.41141452026367187,
+    "cuda_ms": 0.08432844543457031,
+    "speedup": 4.878715813430769
+  },
+  "full_optimizer_step": {
+    "pytorch_ms": 358.68232421875,
+    "cuda_ms": 357.5962158203125,
+    "speedup": 1.0030372480199379
+  },
+  "peak_memory_mb": 38.018048
+}

@@ -19,8 +19,14 @@
 - [x] Docker serving infrastructure
 - [x] Git pushed (8 commits to main)
 
+### Completed (Phase 2)
+- [x] CUDA kernel JIT integration verified (svd_nuclear_prox + fused_mask_ce)
+- [x] Kernel benchmark: svd_prox 78x speedup, mask_ce 4.9x speedup
+- [x] UAV evaluation pipeline (SERAPHIM, DroneVehicle-night, BirdDrone)
+- [x] UAV eval results: 0% detection drop (perturbation near-zero, regularization-dominated)
+- [x] TRAINING_REPORT.md updated with benchmarks + UAV eval
+
 ### Remaining
-- [ ] Full-scale training (500 images, 100 iterations) for paper reproduction
-- [ ] Integrate custom CUDA kernels into attack loop (currently PyTorch fallback)
-- [ ] Video surveillance dataset evaluation (PETS, EPFL-RLC, CW4C)
-- [ ] Benchmark: latency comparison PyTorch vs custom CUDA kernels
+- [ ] Re-train with reduced regularization (λ₁=0.01, λ₂=0.001) for stronger attack
+- [ ] Implement randomized SVD to reduce per-step cost (currently 357ms dominated by SVD)
+- [ ] Full-scale UAV evaluation (all images, not just 200 sample)

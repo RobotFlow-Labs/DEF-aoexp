@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-import torch
 
 from def_aoexp.data_pipeline import COCOImageDataset
 
