@@ -57,8 +57,9 @@ def export_onnx(
 ):
     """Export perturbation applier as ONNX model."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    model = PerturbationApplier(perturbation.clone())
+    model = PerturbationApplier(perturbation.clone().cpu())
     model.eval()
+    model.cpu()
 
     h, w = image_size
     dummy = torch.randn(3, h, w)
